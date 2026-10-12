@@ -1,0 +1,99 @@
+name: E-kart orders deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      kube_deploy_delete:
+        description: "kube_deploy_delete"
+        required: true
+        default: "yes"
+
+env:
+  cluster_name: "azure-ceq-east-us-obr-aks-occ"
+  cluster_rg: "rg-ceq-in-occ-poc"
+  user_name: "manikanta26"
+  image_name: "az_ceq_ekart_orders"
+  directory: "./orders"
+  image_label: "az-ceq-ekart-orders"
+
+
+jobs:
+  Update_and_Deploy_Docker_Image_to_K8S_Cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fetch Docker image version
+        id: fetch-version
+        run: |
+          image_name=${{ ENV.user_name }}/${{ ENV.image_name }}
+          url="https://hub.docker.com/v2/repositories/${image_name}/tags/?page_size=25&page=1&ordering=last_updated"
+          version=$(curl -s ${url} | jq -r '.results | map(select(.name != "latest")) | .[0].name')
+          echo "Last pushed version of this Docker image is: $version"
+          echo "VERSION=${version}" >> "$GITHUB_OUTPUT"
+   
+      - name: Updating the image version
+        if: ${{ github.event.inputs.kube_deploy_delete == 'yes' }}
+        id: update-version
+        run: |
+          version=${{ steps.fetch-version.outputs.VERSION }}
+          version_number=$(echo "$version" | sed 's/^v//')  
+          new_version="v$((version_number + 1))"
+          echo "New version: $new_version"
+          echo "NEW_VERSION=${new_version}" >> "$GITHUB_OUTPUT"
+       
+      - name: Log in to Docker Hub
+        if: ${{ github.event.inputs.kube_deploy_delete == 'yes' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.AZ_DOCKER_USERNAME }}
+          password: ${{ secrets.AZ_DOCKER_PASSWORD }}
+
+      - name: Build & Push Docker image
+        if: ${{ github.event.inputs.kube_deploy_delete == 'yes' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ ENV.directory }}
+          file: ${{ ENV.directory }}/Dockerfile
+          push: true
+          tags: ${{ ENV.user_name }}/${{ ENV.image_name }}:${{ steps.update-version.outputs.NEW_VERSION }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        id: azure-login
+        with:
+            creds: '{"clientId":"${{ secrets.CEQ_AZURE_SANDBOX2_TF_ARM_CLIENT_ID }}","clientSecret":"${{ secrets.CEQ_AZURE_SANDBOX2_TF_ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.CEQ_AZURE_SANDBOX2_TF_ARM_SUBS_ID }}","tenantId":"${{ secrets.CEQ_AZURE_SANDBOX2_TF_ARM_TENANT_ID }}"}'
+
+      - name: AKS Cluster Login
+        uses: azure/aks-set-context@v4
+        id: aks-login
+        with:
+            resource-group: "${{ ENV.cluster_rg }}"
+            cluster-name: "${{ ENV.cluster_name }}"
+        
+      - name: Kube Deploy
+        id: KubeDeploy
+        env:
+          KUBE_DEP: ${{ contains(github.event.inputs.kube_deploy_delete, 'yes') }}
+        run: |
+          if ${KUBE_DEP} == true; then
+          sed -i '/${{ ENV.user_name }}\/${{ ENV.image_name }}:/ s/v[0-9]\{1,3\}/${{ steps.update-version.outputs.NEW_VERSION }}/g' deployment.yaml
+            cat deployment.yaml
+            kubectl apply -f deployment.yaml
+          fi
+        working-directory: ${{ ENV.directory }}/kubernetes
+
+      - name: Kube Deploy Pod Status
+        id: KubeDeployStatus
+        run: |
+          {
+            kubectl get pod -l app=${{ ENV.image_label }} -o jsonpath='{.items[*].status.containerStatuses[*].state}' > podstatus
+          } || {
+            echo "Error with Cluster"
+            cat podstatus
+          }
+          echo "POD_STATUS=$(cat podstatus)" >> $GITHUB_OUTPUT             
+
+      - run: echo '${{ ENV.image_label }} PODSTATUS= ${{ steps.KubeDeployStatus.outputs.POD_STATUS }}'
+      

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: az-ceq-ekart-product
+spec:
+
+  selector:
+    matchLabels:
+      app: az-ceq-ekart-product
+  template:
+    metadata:
+      labels:
+        app: az-ceq-ekart-product
+    spec:
+      containers:
+      - name: az-ceq-ekart-product
+        image: manikanta26/az_ceq_ekart_products:v4
+        env:
+        - name: DB_NAME
+          value: "shop_cart"
+        - name: DB_HOST
+          value: az-mysql-fs-ceq-in-ekart-server.mysql.database.azure.com
+        - name: DB_USER
+          value: shopcart
+        - name: DB_PASSWORD
+          value: "cloudeq@1234"
+        - name: USER_RESPONSE
+          value: http://52.249.235.129:8000
+        ports:
+        - containerPort: 7001

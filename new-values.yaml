@@ -1,0 +1,102 @@
+global:
+  domain: app.coralogix.in
+  clusterName: shopping-cart-coralogix-otel
+opentelemetry-cluster-collector:
+  image:  
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.145.0"
+  presets:
+    kubernetesEvents:
+      enabled: true
+    reduceResourceAttributes:
+      enabled: true
+    kubernetesResources:
+      enabled: true
+    fleetManagement:
+      enabled: true
+      supervisor:
+        enabled: false
+    clusterMetrics:
+      enabled: true
+    collectorMetrics:
+      enabled: true
+    kubernetesApiServerMetrics:
+      enabled: true
+      scrapeAll: false
+opentelemetry-agent:
+  image:  
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.145.0"
+  # receivers:
+  #   otlp:
+  #     protocols:
+  #       grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 20 }
+  #       http: { endpoint: 0.0.0.0:4318 }
+  presets:
+    # otlpReceiver:
+    #   enabled: true
+    hostEntityEvents:
+      enabled: true
+    fleetManagement:
+      enabled: true
+      supervisor:
+        enabled: false
+    spanMetrics:
+      enabled: true
+      histogramBuckets:
+      - 1ms
+      - 4ms
+      - 10ms
+      - 20ms
+      - 50ms
+      - 100ms
+      - 200ms
+      - 500ms
+      - 1s
+      - 2s
+      - 5s
+      transformStatements: []
+    headSampling:
+      enabled: true
+      percentage: 10.0
+    profilesCollection:
+      enabled: false
+    transactions:
+      enabled: true
+      waitDuration: '30'
+    logsCollection:
+      enabled: true
+      reduceLogAttributes:
+        enabled: true
+    kubeletMetrics:
+      enabled: true
+    collectorMetrics:
+      enabled: true
+    statsdReceiver:
+      enabled: true
+    hostMetrics:
+      enabled: true
+      process:
+        enabled: true
+    kubernetesExtraMetrics:
+      enabled: true
+      scrapeAll: false
+      perNode: true
+    reduceResourceAttributes:
+      enabled: true
+    coralogixExporter:
+      enabled: true
+      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+
+      pipelines:
+      - logs
+      - metrics
+      - traces
+  targetAllocator:
+    enabled: false
+coralogix-ebpf-profiler:
+  enabled: false
+opentelemetry-ebpf-instrumentation:
+  enabled: true
+coralogix-operator:
+  enabled: false

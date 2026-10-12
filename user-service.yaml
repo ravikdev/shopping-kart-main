@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-service
+  labels:
+    app: ceq-user
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ceq-user
+
+  template:
+    metadata:
+      labels:
+        app: ceq-user
+
+    spec:
+      containers:
+      - name: users-service
+        image: ankita1122222/user-service:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 8003
+
+        env:
+
+        #################################################
+        # Database configuration
+        #################################################
+
+        - name: DB_NAME
+          value: "Shopping_Cart"
+
+        - name: DB_USER
+          value: "admin"
+
+        - name: DB_PASSWORD
+          value: "rdsadmin"
+
+        - name: DIALECT
+          value: "mysql"
+
+        - name: DB_HOST
+          value: "shopping-cart-db.cf6c8yamwday.us-east-1.rds.amazonaws.com"
+
+        - name: ALLOWED_IPS
+          value: "localhost,a26c27d572e014ec28d563916fd11515-1430840935.us-east-1.elb.amazonaws.com,shoppingcart-lb-1985465652.us-east-1.elb.amazonaws.com"
+
+        - name: ACCESS_PRIVATE_KEY
+          value: "hello##123"
+        
+        - name: REFRESH_PRIVATE_KEY
+          value: "demo@@456"  
+
+        #################################################
+        # Service communication
+        #################################################
+
+        - name: USER_RESPONSE
+          value: "http://users-service:8003"
+
+        - name: PRODUCT_RESPONSE
+          value: "http://products-service:8004"
+
+        #################################################
+        # OpenTelemetry configuration
+        #################################################
+
+        - name: OTEL_SERVICE_NAME
+          value: "users-service"
+
+        # - name: OTEL_RESOURCE_ATTRIBUTES
+        #   value: "service.name=user-service,k8s.cluster.name=shopping-cart-coralogix-otel"
+
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://coralogix-opentelemetry-collector.default.svc.cluster.local:4317"
+
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "grpc"
+
+        - name: OTEL_LOGS_EXPORTER
+          value: "otlp"
+
+        - name: OTEL_METRICS_EXPORTER
+          value: "otlp"
+
+        - name: OTEL_TRACES_EXPORTER
+          value: "otlp"
+
+        #################################################
+        # Resource limits (recommended)
+        #################################################
+
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-service
+  labels:
+    app: ceq-user
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: ceq-user
+
+  ports:
+  - name: http
+    port: 8003
+    targetPort: 8003
+    protocol: TCP

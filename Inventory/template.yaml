@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Inventory
+
+  Sample SAM Template for Inventory
+  
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  InventoryFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Layer:
+      - "arn:aws:lambda:us-east-1:625240141681:layer:coralogix-nodejs-wrapper-and-exporter-x86_64:31"
+      - "arn:aws:lambda:us-east-1:625240141681:layer:coralogix-aws-lambda-telemetry-exporter-x86_64:38"
+    Properties:
+      CodeUri: inventory/
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/otel-handler"
+          CX_API_KEY: "cxtp_7uJId4G1fnqUIu6uMMo7VlepS53C5i"
+          CX_APPLICATION: "Inventory-service"
+          CX_DOMAIN: "ap1.coralogix.com"
+          CX_REPORTING_STRATEGY: "REPORT_AFTER_INVOCATION"
+          CX_SUBSYSTEM: "LambdaDT"
+          CX_TAGS_ENABLED: "true"
+          OTEL_LOGS_EXPORTER: "otlp"
+          OTEL_PAYLOAD_SIZE_LIMIT: "51200"
+          OTEL_PROPAGATORS: "tracecontext,baggage"
+          OTEL_RESOURCE_ATTRIBUTES: "env=prod,team=backend"
+          DB_NAME: "Shopping_Cart"
+          DB_USER: "admin"
+          DB_PASSWORD: "rdsadmin" 
+          DIALECT: "mysql"
+          DB_HOST: "shopping-cart-db.cf6c8yamwday.us-east-1.rds.amazonaws.com"
+      Events:
+        GetInventory:
+          Type: Api
+          Properties:
+            Path: /inventory/{id}
+            Method: get
+
+        CreateInventory:
+          Type: Api
+          Properties:
+            Path: /inventory/{id}
+            Method: post
+
+        UpdateInventory:
+          Type: Api
+          Properties:
+            Path: /inventory/{id}
+            Method: put
+
+        DeleteInventory:
+          Type: Api
+          Properties:
+            Path: /inventory/{id}
+            Method: delete
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  InventoryApi:
+    Description: "API Gateway endpoint URL for Prod stage for Inventory function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/inventory/"
+  InventoryFunction:
+    Description: "Inventory Lambda Function ARN"
+    Value: !GetAtt InventoryFunction.Arn
+  InventoryFunctionIamRole:
+    Description: "Implicit IAM Role created for Inventory function"
+    Value: !GetAtt InventoryFunctionRole.Arn

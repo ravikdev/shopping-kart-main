@@ -1,0 +1,165 @@
+services:
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: opentelemetry-collector
+    deploy:
+      resources:
+        limits:
+          memory: 125M
+    restart: unless-stopped
+    volumes:
+      - ./collector_config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4318:4318"   #OTEL gRPC
+      - "4317:4317"   #OTEL HTTP
+      - "8888:8888"   #Opentelemetry-collector metrics
+      - "8889:8889"   #Prometheus exporter
+      - "13133:13133" # Health check
+    networks:
+      - shop_cart_network
+  mysql:
+    image: mysql
+    container_name: MySQL
+    restart: always
+    cap_add:
+      - SYS_NICE
+    environment:
+      - MYSQL_ROOT_PASSWORD=joban
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    networks:
+      - shop_cart_network
+
+  mysql-workbench:
+    image: lscr.io/linuxserver/mysql-workbench:latest
+    container_name: mysql-workbench
+    depends_on:
+      - mysql
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /path/to/config:/config
+    ports:
+      - 3000:3000
+      - 3001:3001
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+    networks:
+      - shop_cart_network
+  
+  users:
+    image: users-service
+    container_name: users-service
+    build: ./users
+    ports:
+      - "8003:8003"
+    environment:
+      - OTEL_SERVICE_NAME=ceq-users-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318
+    env_file:
+      - ./users/.env.local
+    networks:
+      - shop_cart_network
+
+  # rabbitmq:
+  #   image: rabbitmq:3.8-management-alpine
+  #   container_name: 'rabbitmq'
+  #   ports:
+  #       - 5672:5672
+  #       - 15672:15672
+  #   # volumes:
+  #       # - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+  #       # - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+  #   networks:
+  #       - shop_cart_network
+
+  orders:
+    image: orders-service
+    container_name: orders-service
+    build: ./orders
+    ports:
+      - "8002:8002"
+    depends_on:
+      - mysql
+    environment:
+      - OTEL_SERVICE_NAME=ceq-orders-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318
+    env_file:
+      - ./orders/.env.local
+    networks:
+      - shop_cart_network
+
+  products:
+    image: products-service
+    container_name: products-service
+    build: ./products
+    ports:
+      - "8004:8004"
+    depends_on:
+      - mysql
+    environment:
+      - OTEL_SERVICE_NAME=ceq-products-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318
+    env_file:
+      - ./products/.env.local
+    networks:
+      - shop_cart_network
+
+  api-gateway:
+    image: api-gateway
+    container_name: api-gateway
+    build: ./api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - OTEL_SERVICE_NAME=ceq-api-gateway
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318
+    env_file:
+      - ./api-gateway/.env.local
+    networks:
+      - shop_cart_network
+  cart:
+    image: cart-service
+    container_name: cart-service
+    build: ./cart
+    ports:
+      - "8001:8001"
+    depends_on:
+      - mysql
+    environment:
+      - OTEL_SERVICE_NAME=ceq-cart-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318
+    env_file:
+      - ./cart/.env.local
+    networks:
+      - shop_cart_network
+
+  frontend:
+    image: frontend-service
+    container_name: frontend-service
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api-gateway
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318
+      - OTEL_SERVICE_NAME=ceq-frontend-service
+    #   - RABBITMQ_URL=amqp://rabbitmq:5672
+    env_file:
+      - ./frontend/.env.local
+    networks:
+      - shop_cart_network
+
+volumes:
+  mysql-data:
+
+networks:
+  shop_cart_network:
+    driver: bridge
+ 

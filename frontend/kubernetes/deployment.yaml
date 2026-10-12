@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: raghavenderreddylonka/shopping_frontend:v8
+        env:
+        - name: VITE_AUTH_API
+          value: http://35.196.169.101:8000/api/v1
+        - name: VITE_PROD_API
+          value: http://35.237.123.229:7001/api/v1/products
+        - name: VITE_CART_API
+          value: http://104.196.127.34:8001/api/v1
+        - name: VITE_ORDER_API
+          value: http://104.196.213.253:8002/api/v1/orders
+        - name: VITE_NR_CART_IP
+          value: http://104.196.127.34:8001
+        - name: VITE_NR_ORDER_IP
+          value: http://104.196.213.253:8002
+        - name: VITE_NR_PROD_IP
+          value: http://35.237.123.229:7001
+        - name: VITE_NR_USERS_IP
+          value: http://35.196.169.101:8000
+        ports:
+        - containerPort: 5173

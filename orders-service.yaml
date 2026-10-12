@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  labels:
+    app: ceq-order
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ceq-order
+
+  template:
+    metadata:
+      labels:
+        app: ceq-order
+
+    spec:
+      containers:
+      - name: order-service
+        image: ankita1122222/order-service:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 8002
+
+        env:
+
+        #################################################
+        # Database configuration
+        #################################################
+
+        - name: DB_NAME
+          value: "Shopping_Cart"
+
+        - name: DB_USER
+          value: "admin"
+
+        - name: DB_PASSWORD
+          value: "rdsadmin"
+
+        - name: DIALECT
+          value: "mysql"
+
+        - name: DB_HOST
+          value: "shopping-cart-db.cf6c8yamwday.us-east-1.rds.amazonaws.com"
+
+        #################################################
+        # Service communication
+        #################################################
+
+        - name: USER_RESPONSE
+          value: "http://users-service:8003"
+
+        - name: PRODUCT_RESPONSE
+          value: "http://products-service:8004"
+
+        - name: EMPTY_CART
+          value: "http://cart-service:8001"
+
+        #################################################
+        # OpenTelemetry configuration
+        #################################################
+
+        - name: OTEL_SERVICE_NAME
+          value: "order-service"
+
+        # - name: OTEL_RESOURCE_ATTRIBUTES
+        #   value: "service.name=user-service,k8s.cluster.name=shopping-cart-coralogix-otel"
+
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://coralogix-opentelemetry-collector.default.svc.cluster.local:4317"
+
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "grpc"
+
+        - name: OTEL_LOGS_EXPORTER
+          value: "otlp"
+
+        - name: OTEL_METRICS_EXPORTER
+          value: "otlp"
+
+        - name: OTEL_TRACES_EXPORTER
+          value: "otlp"
+        
+        - name: ALLOWED_IPS
+          value: "localhost,a26c27d572e014ec28d563916fd11515-1430840935.us-east-1.elb.amazonaws.com,shoppingcart-lb-1985465652.us-east-1.elb.amazonaws.com"
+
+        - name: ACCESS_PRIVATE_KEY
+          value: "hello##123"
+        
+        - name: REFRESH_PRIVATE_KEY
+          value: "demo@@456"
+
+        #################################################
+        # Resource limits (recommended)
+        #################################################
+
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  labels:
+    app: ceq-order
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: ceq-order
+
+  ports:
+  - name: http
+    port: 8002
+    targetPort: 8002
+    protocol: TCP

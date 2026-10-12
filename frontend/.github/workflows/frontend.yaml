@@ -1,0 +1,82 @@
+# Docker YAML file
+name: Deploy to Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      kube_deploy_delete:
+        description: "kube_deploy_delete"
+        required: true
+        default: "yes"
+  # push:
+  #   branches:
+  #     - main
+    
+  
+
+jobs:
+  job1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get_image_version
+        uses: luoqiz/docker-images-latest-version@master
+        id: get_image_version
+        with:
+          image: raghavenderreddylonka/shopping_frontend:v8
+
+      - name: latest version
+        shell: bash
+        id: tagversion
+        run: |
+          version=${{ steps.get_image_version.outputs.version }}
+          echo ${{ steps.get_image_version.outputs.version }} | sed 's/v//g' > version
+          echo "$((version + 1))" > version
+          echo "VERSION=$(cat version)" >> $GITHUB_OUTPUT
+          # version=${{ steps.get_image_version.outputs.version }}
+          # echo ${{ steps.get_image_version.outputs.version }} | sed 's/v//g' > version
+          # echo 1 + $(version) | bc > version
+          # echo "VERSION=$(cat version)" >> $GITHUB_OUTPUT
+
+      - run: echo 'TAGVERSION=${{ steps.tagversion.outputs.VERSION }}'
+        if: always()
+
+      - name: Log in to Docker Hub
+        if: ${{ github.event.inputs.kube_deploy_delete == 'yes' }}
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push Docker image
+        if: ${{ github.event.inputs.kube_deploy_delete == 'yes' }}
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: raghavenderreddylonka/shopping_frontend:v8${{ steps.tagversion.outputs.VERSION }}
+      
+      - name: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.gcp_credentials }}'
+
+      - name: 'get-credentials'
+        uses: 'google-github-actions/get-gke-credentials@v2'
+        with:
+          cluster_name: 'ceq-ekart-cluster'
+          location: 'us-east1-c'
+
+      - name: Kube Deploy
+        id: kubeApplyStatus
+        env:
+          KUBE_DEP: ${{ contains(github.event.inputs.kube_deploy_delete, 'yes') }}
+        run: |
+          if ${KUBE_DEP} == true; then
+            sed -i 's/v10/v${{ steps.tagversion.outputs.VERSION }}/g' deployment.yaml
+            kubectl apply -f deployment.yaml
+          fi
+        working-directory: kubernetes

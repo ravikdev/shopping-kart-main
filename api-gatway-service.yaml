@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+
+    spec:
+      containers:
+      - name: api-gateway
+        image: ankita1122222/api-gateway:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 8000
+
+        env:
+
+        #################################################
+        # Database configuration
+        #################################################
+
+        # - name: DB_NAME
+        #   value: "Shopping_Cart"
+
+        # - name: DB_USER
+        #   value: "admin"
+
+        # - name: DB_PASSWORD
+        #   value: "rdsadmin"
+
+        # - name: DIALECT
+        #   value: "mysql"
+
+        # - name: DB_HOST
+        #   value: "shopping-cart-db.cf6c8yamwday.us-east-1.rds.amazonaws.com"
+
+        #################################################
+        # Service communication
+        #################################################
+
+        - name: USERS_ENDPOINT
+          value: "http://users-service:8003"
+
+        - name: PRODUCTS_ENDPOINT
+          value: "http://products-service:8004"
+
+        - name: ORDERS_ENDPOINT
+          value: "http://order-service:8002"
+
+        - name: CART_ENDPOINT
+          value: "http://cart-service:8001"
+
+        #################################################
+        # OpenTelemetry configuration
+        #################################################
+
+        - name: OTEL_SERVICE_NAME
+          value: "api-gateway"
+
+        # - name: OTEL_RESOURCE_ATTRIBUTES
+        #   value: "service.name=user-service,k8s.cluster.name=shopping-cart-coralogix-otel"
+
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://coralogix-opentelemetry-collector.default.svc.cluster.local:4317"
+
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "grpc"
+
+        - name: OTEL_LOGS_EXPORTER
+          value: "otlp"
+
+        - name: OTEL_METRICS_EXPORTER
+          value: "otlp"
+
+        - name: OTEL_TRACES_EXPORTER
+          value: "otlp"
+        
+        - name: ALLOWED_IPS
+          value: "localhost,a26c27d572e014ec28d563916fd11515-1430840935.us-east-1.elb.amazonaws.com,shoppingcart-lb-1985465652.us-east-1.elb.amazonaws.com"
+
+        - name: ACCESS_PRIVATE_KEY
+          value: "hello##123"
+        
+        - name: REFRESH_PRIVATE_KEY
+          value: "demo@@456"
+
+        # - name: INVENTORY_URL
+        #   value: "https://si9buck60e.execute-api.us-east-1.amazonaws.com"
+
+        #################################################
+        # Resource limits (recommended)
+        #################################################
+
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-service
+  labels:
+    app: api-gateway-service
+
+spec:
+  type: LoadBalancer
+
+  selector:
+    app: api-gateway
+
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP

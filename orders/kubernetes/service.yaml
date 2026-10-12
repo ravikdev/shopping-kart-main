@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: az-ceq-ekart-orders
+  labels:
+    app: az-ceq-ekart-orders
+spec:
+  ports:
+  - port: 8002
+    targetPort: 8002
+    protocol: TCP
+  selector:
+    app: az-ceq-ekart-orders
+  type: LoadBalancer
